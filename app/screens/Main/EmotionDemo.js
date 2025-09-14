@@ -11,8 +11,8 @@ import {
   Alert
 } from 'react-native';
 
-import { useEmotionAnalysis } from '../../hooks/emotion/useEmotionAnalysis.js';
-import EmotionalProfileIndicator from '../../components/Chat/EmotionalProfileIndicator.js';
+import { useEmotionAnalysis } from '../../hooks/emotion/useEmotionAnalysisSimple.js';
+import EmotionalProfileIndicator from '../../components/Chat/EmotionalProfileIndicatorSimple.js';
 import { EMOTION_COLORS, EMOTION_ICONS } from '../../types/emotion.types.js';
 
 const EmotionDemo = () => {
@@ -96,7 +96,7 @@ const EmotionDemo = () => {
 
     return (
       <View style={styles.resultContainer}>
-        <Text style={styles.resultTitle}>Résultat de l'analyse</Text>
+        <Text style={styles.resultTitle}>Résultat de l&apos;analyse</Text>
         
         {/* Score de confiance */}
         <View style={styles.confidenceContainer}>
@@ -219,7 +219,7 @@ const EmotionDemo = () => {
 
       {/* Zone de saisie */}
       <View style={styles.inputSection}>
-        <Text style={styles.inputLabel}>Tapez votre message :</Text>
+        <Text style={styles.inputLabel}>Tapez votre message</Text>
         <TextInput
           style={styles.textInput}
           value={inputText}

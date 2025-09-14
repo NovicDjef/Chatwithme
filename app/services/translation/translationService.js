@@ -1,8 +1,9 @@
 // services/translation/translationService.js - Version production avec gestion d'erreurs
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-netinfo/lib';
+import NetInfo from "@react-native-community/netinfo";
 
 class TranslationService {
+
   constructor() {
     this.cache = new Map();
     this.apiKeys = {

@@ -1,10 +1,9 @@
 // services/emotion/advancedEmotionAnalysis.js - Service d'analyse émotionnelle avec APIs avancées
 
 import {
-  BASIC_EMOTIONS,
   EMOTION_PROVIDERS,
-  EmotionAnalysisResult,
   EmotionAnalysisConfig,
+  EmotionAnalysisResult,
   EmotionValidators
 } from '../../types/emotion.types.js';
 

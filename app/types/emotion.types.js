@@ -1,7 +1,7 @@
-// types/emotion.types.js - Définitions TypeScript pour le système émotionnel
+// types/emotion.types.js - DÃ©finitions TypeScript pour le systÃ¨me Ã©motionnel
 
 /**
- * Émotions de base reconnues par le système
+ * Ã‰motions de base reconnues par le systÃ¨me
  */
 export const BASIC_EMOTIONS = {
   JOY: 'joy',
@@ -15,7 +15,7 @@ export const BASIC_EMOTIONS = {
 };
 
 /**
- * Niveaux d'intensité émotionnelle
+ * Niveaux d'intensitÃ© Ã©motionnelle
  */
 export const EMOTION_INTENSITY = {
   VERY_LOW: 0.1,
@@ -26,7 +26,7 @@ export const EMOTION_INTENSITY = {
 };
 
 /**
- * Providers d'analyse émotionnelle supportés
+ * Providers d'analyse Ã©motionnelle supportÃ©s
  */
 export const EMOTION_PROVIDERS = {
   AZURE_TEXT_ANALYTICS: 'azure_text',
@@ -37,7 +37,7 @@ export const EMOTION_PROVIDERS = {
 };
 
 /**
- * Structure d'un résultat d'analyse émotionnelle
+ * Structure d'un rÃ©sultat d'analyse Ã©motionnelle
  */
 export class EmotionAnalysisResult {
   constructor({
@@ -51,7 +51,7 @@ export class EmotionAnalysisResult {
     timestamp = new Date(),
     warnings = [],
     metadata = {}
-  }) {
+  } = {}) {
     this.emotions = emotions; // { joy: 0.8, sadness: 0.2, ... }
     this.dominantEmotion = dominantEmotion; // 'joy'
     this.confidence = confidence; // 0.0 - 1.0
@@ -66,7 +66,7 @@ export class EmotionAnalysisResult {
 }
 
 /**
- * Configuration d'analyse émotionnelle
+ * Configuration d'analyse Ã©motionnelle
  */
 export class EmotionAnalysisConfig {
   constructor({
@@ -78,7 +78,7 @@ export class EmotionAnalysisConfig {
     enableFallback = true,
     maxRetries = 2,
     timeout = 5000
-  }) {
+  } = {}) {
     this.provider = provider;
     this.language = language;
     this.culturalContext = culturalContext;
@@ -91,7 +91,7 @@ export class EmotionAnalysisConfig {
 }
 
 /**
- * Profil émotionnel d'un utilisateur
+ * Profil Ã©motionnel d'un utilisateur
  */
 export class UserEmotionalProfile {
   constructor({
@@ -104,9 +104,9 @@ export class UserEmotionalProfile {
     emotionalSensitivity = 0.5,
     privacySettings = {},
     lastUpdated = new Date()
-  }) {
+  } = {}) {
     this.userId = userId;
-    this.baselineEmotions = baselineEmotions; // Émotions habituelles
+    this.baselineEmotions = baselineEmotions; // Ã‰motions habituelles
     this.emotionalTraits = emotionalTraits; // { empathy: 0.8, expressiveness: 0.6 }
     this.communicationStyle = communicationStyle; // 'formal', 'casual', 'expressive'
     this.preferredLanguages = preferredLanguages;
@@ -118,7 +118,7 @@ export class UserEmotionalProfile {
 }
 
 /**
- * État émotionnel temporaire d'un utilisateur
+ * Ã‰tat Ã©motionnel temporaire d'un utilisateur
  */
 export class EmotionalState {
   constructor({
@@ -131,7 +131,7 @@ export class EmotionalState {
     context = {},
     timestamp = new Date(),
     expiresAt = null
-  }) {
+  } = {}) {
     this.userId = userId;
     this.currentEmotions = currentEmotions;
     this.mood = mood; // 'happy', 'sad', 'neutral', 'excited', etc.
@@ -140,12 +140,12 @@ export class EmotionalState {
     this.availability = availability; // 'available', 'busy', 'do_not_disturb'
     this.context = context; // { location: 'work', activity: 'meeting' }
     this.timestamp = timestamp;
-    this.expiresAt = expiresAt || new Date(Date.now() + 4 * 60 * 60 * 1000); // 4h par défaut
+    this.expiresAt = expiresAt || new Date(Date.now() + 4 * 60 * 60 * 1000); // 4h par dÃ©faut
   }
 }
 
 /**
- * Score de compatibilité émotionnelle entre utilisateurs
+ * Score de compatibilitÃ© Ã©motionnelle entre utilisateurs
  */
 export class EmotionalCompatibility {
   constructor({
@@ -158,7 +158,7 @@ export class EmotionalCompatibility {
     recommendedTiming = [],
     factors = {},
     calculatedAt = new Date()
-  }) {
+  } = {}) {
     this.user1Id = user1Id;
     this.user2Id = user2Id;
     this.overallScore = overallScore; // 0.0 - 1.0
@@ -166,13 +166,13 @@ export class EmotionalCompatibility {
     this.empathyScore = empathyScore;
     this.energyAlignment = energyAlignment;
     this.recommendedTiming = recommendedTiming; // ['morning', 'evening']
-    this.factors = factors; // Détails du calcul
+    this.factors = factors; // DÃ©tails du calcul
     this.calculatedAt = calculatedAt;
   }
 }
 
 /**
- * Historique émotionnel
+ * Historique Ã©motionnel
  */
 export class EmotionHistory {
   constructor({
@@ -181,11 +181,11 @@ export class EmotionHistory {
     patterns = {},
     insights = [],
     period = 'week'
-  }) {
+  } = {}) {
     this.userId = userId;
     this.entries = entries; // Array of EmotionalState
-    this.patterns = patterns; // Tendances détectées
-    this.insights = insights; // Observations générées par IA
+    this.patterns = patterns; // Tendances dÃ©tectÃ©es
+    this.insights = insights; // Observations gÃ©nÃ©rÃ©es par IA
     this.period = period; // 'day', 'week', 'month'
   }
 }
@@ -217,13 +217,12 @@ export const EMOTION_COLORS = {
 };
 
 export const EMOTION_ICONS = {
-  joy: '=
-',
-  sadness: '="',
-  anger: '= ',
-  fear: '=0',
-  surprise: '=.',
-  disgust: '>"',
-  trust: '>',
-  anticipation: '>'
+  joy: 'ğŸ™‚',
+  sadness: 'ğŸ˜¢',
+  anger: 'ğŸ˜ ',
+  fear: 'ğŸ˜°',
+  surprise: 'ğŸ˜²',
+  disgust: 'ğŸ¤¢',
+  trust: 'ğŸ˜Š',
+  anticipation: 'ğŸ¤”'
 };

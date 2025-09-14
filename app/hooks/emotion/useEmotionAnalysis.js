@@ -1,364 +1,288 @@
-// hooks/emotion/useEmotionAnalysis.js - Hook pour l'analyse Èmotionnelle avancÈe
-
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState } from 'react-native';
-
-import { advancedEmotionService } from '../../services/emotion/advancedEmotionAnalysis.js';
-import { emotionalProfileService } from '../../services/emotion/emotionalProfileService.js';
-import { 
-  EmotionAnalysisConfig, 
-  EMOTION_PROVIDERS,
-  EmotionValidators 
+// hooks/emotion/useEmotionAnalysis.js
+import { useCallback, useEffect, useRef, useState } from 'react';
+import emotionAnalysisService from '../../services/emotion/advancedEmotionAnalysis.js';
+import {
+  BASIC_EMOTIONS,
+  EmotionAnalysisConfig
 } from '../../types/emotion.types.js';
 
-export const useEmotionAnalysis = (userId, recipientId = null, config = {}) => {
-  // …tats principaux
+export const useEmotionAnalysis = (initialConfig = {}) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState(null);
-  const [currentState, setCurrentState] = useState(null);
-  const [compatibility, setCompatibility] = useState(null);
-  const [emotionHistory, setEmotionHistory] = useState(null);
+  const [lastResult, setLastResult] = useState(null);
   const [error, setError] = useState(null);
+  const [history, setHistory] = useState([]);
+  
+  // R√©f√©rence pour √©viter les re-renders inutiles
+  const configRef = useRef(new EmotionAnalysisConfig(initialConfig));
+  const abortControllerRef = useRef(null);
 
-  // Configuration
-  const [analysisConfig, setAnalysisConfig] = useState(
-    new EmotionAnalysisConfig(config)
-  );
-
-  // RÈfÈrences pour Èviter les re-renders
-  const lastAnalysisRef = useRef(null);
-  const analysisQueueRef = useRef([]);
-  const isProcessingRef = useRef(false);
-
-  // Initialisation
+  // Mettre √† jour la config si n√©cessaire
   useEffect(() => {
-    if (userId) {
-      initializeEmotionalData();
-    }
-
-    // …coute des changements d'Ètat de l'app
-    const handleAppStateChange = (nextAppState) => {
-      if (nextAppState === 'active' && userId) {
-        refreshEmotionalState();
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
-  }, [userId]);
-
-  // Rechargement des donnÈes de compatibilitÈ quand le destinataire change
-  useEffect(() => {
-    if (userId && recipientId) {
-      loadCompatibilityData();
-    }
-  }, [userId, recipientId]);
+    configRef.current = new EmotionAnalysisConfig({ 
+      ...configRef.current, 
+      ...initialConfig 
+    });
+  }, [initialConfig]);
 
   /**
-   * Initialisation des donnÈes Èmotionnelles
+   * Analyser un texte
    */
-  const initializeEmotionalData = async () => {
-    try {
-      // Chargement du profil utilisateur
-      const profile = await emotionalProfileService.getEmotionalProfile(userId);
-      setCurrentProfile(profile);
-
-      // Chargement de l'Ètat Èmotionnel actuel
-      const state = await emotionalProfileService.getEmotionalState(userId);
-      setCurrentState(state);
-
-      // Chargement de l'historique
-      const history = await emotionalProfileService.getEmotionHistory(userId);
-      setEmotionHistory(history);
-
-    } catch (error) {
-      console.error('Erreur initialisation donnÈes Èmotionnelles:', error);
-      setError(error.message);
+  const analyzeText = useCallback(async (text, options = {}) => {
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      const error = new Error('Le texte √† analyser ne peut pas √™tre vide');
+      setError(error);
+      return null;
     }
-  };
 
-  /**
-   * Chargement des donnÈes de compatibilitÈ
-   */
-  const loadCompatibilityData = async () => {
-    if (!userId || !recipientId) return;
+    // Annuler l'analyse pr√©c√©dente si en cours
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    setIsAnalyzing(true);
+    setError(null);
 
     try {
-      const compatibilityData = await emotionalProfileService.calculateEmotionalCompatibility(
-        userId, 
-        recipientId
-      );
-      setCompatibility(compatibilityData);
-    } catch (error) {
-      console.error('Erreur chargement compatibilitÈ:', error);
-    }
-  };
-
-  /**
-   * Analyse d'un message avec mise ‡ jour du profil
-   */
-  const analyzeMessage = useCallback(async (text, context = {}) => {
-    if (!text || !userId || isProcessingRef.current) {
-      return lastAnalysisRef.current;
-    }
-
-    // Validation des entrÈes
-    if (typeof text !== 'string' || text.trim().length < 2) {
-      return {
-        error: 'Texte invalide pour l\'analyse',
-        confidence: 0
-      };
-    }
-
-    try {
-      setIsAnalyzing(true);
-      setError(null);
-      isProcessingRef.current = true;
-
-      // Ajout ‡ la queue si plusieurs analyses simultanÈes
-      if (analysisQueueRef.current.length > 0) {
-        analysisQueueRef.current.push({ text, context });
-        return lastAnalysisRef.current;
-      }
-
-      // Analyse principale
-      const result = await emotionalProfileService.analyzeAndUpdateEmotionalState(
-        userId, 
-        text, 
-        context
-      );
-
-      if (result) {
-        // Mise ‡ jour des Ètats locaux
-        setCurrentState(result.state);
-        lastAnalysisRef.current = result.analysis;
-
-        // Recharge de l'historique si nÈcessaire
-        if (result.analysis.confidence > 0.7) {
-          const updatedHistory = await emotionalProfileService.getEmotionHistory(userId);
-          setEmotionHistory(updatedHistory);
-        }
-
-        // Mise ‡ jour de la compatibilitÈ si destinataire prÈsent
-        if (recipientId && result.analysis.confidence > 0.6) {
-          loadCompatibilityData();
-        }
-
-        return result.analysis;
-      }
-
-      return lastAnalysisRef.current;
-
-    } catch (error) {
-      console.error('Erreur analyse message:', error);
-      setError(error.message);
+      const config = { ...configRef.current, ...options };
+      const result = await emotionAnalysisService.analyzeEmotion(text, config);
       
-      return {
-        error: error.message,
-        confidence: 0,
-        emotions: {},
-        warnings: ['Analyse ÈchouÈe']
-      };
+      // V√©rifier si l'analyse n'a pas √©t√© annul√©e
+      if (!abortControllerRef.current?.signal.aborted) {
+        setLastResult(result);
+        setHistory(prev => [...prev.slice(-9), result]); // Garder les 10 derniers
+        return result;
+      }
+      
+      return null;
+    } catch (err) {
+      if (!abortControllerRef.current?.signal.aborted) {
+        console.error('Erreur analyse √©motionnelle:', err);
+        setError(err);
+      }
+      return null;
+    } finally {
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsAnalyzing(false);
+      }
+      abortControllerRef.current = null;
+    }
+  }, []);
 
+  /**
+   * Analyser en mode batch (plusieurs textes)
+   */
+  const analyzeBatch = useCallback(async (texts, options = {}) => {
+    if (!Array.isArray(texts) || texts.length === 0) {
+      const error = new Error('La liste de textes ne peut pas √™tre vide');
+      setError(error);
+      return [];
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const results = await Promise.allSettled(
+        texts.map(text => analyzeText(text, { ...options, enableCaching: true }))
+      );
+
+      const successfulResults = results
+        .filter(result => result.status === 'fulfilled' && result.value)
+        .map(result => result.value);
+
+      const failedCount = results.length - successfulResults.length;
+      if (failedCount > 0) {
+        console.warn(`${failedCount} analyses ont √©chou√© sur ${texts.length}`);
+      }
+
+      return successfulResults;
+    } catch (err) {
+      console.error('Erreur analyse batch:', err);
+      setError(err);
+      return [];
     } finally {
       setIsAnalyzing(false);
-      isProcessingRef.current = false;
-
-      // Traitement de la queue
-      if (analysisQueueRef.current.length > 0) {
-        const next = analysisQueueRef.current.shift();
-        setTimeout(() => analyzeMessage(next.text, next.context), 100);
-      }
     }
-  }, [userId, recipientId, analysisConfig]);
+  }, [analyzeText]);
 
   /**
-   * Analyse rapide sans mise ‡ jour du profil
+   * Analyser en temps r√©el avec debounce
    */
-  const analyzeTextQuick = useCallback(async (text) => {
-    if (!text || typeof text !== 'string') return null;
-
-    try {
-      const result = await advancedEmotionService.analyzeEmotion(text, analysisConfig);
-      return result;
-    } catch (error) {
-      console.error('Erreur analyse rapide:', error);
-      return null;
+  const analyzeRealTime = useCallback(async (text, options = {}) => {
+    if (text && text.length > 3) { // Seuil minimum
+      return await analyzeText(text, options);
     }
-  }, [analysisConfig]);
+    return null;
+  }, [analyzeText]);
 
   /**
-   * Mise ‡ jour manuelle de l'Ètat Èmotionnel
+   * Obtenir l'√©motion dominante du dernier r√©sultat
    */
-  const updateEmotionalState = useCallback(async (newState) => {
-    if (!userId || !newState) return false;
+  const getDominantEmotion = useCallback(() => {
+    return lastResult?.dominantEmotion || null;
+  }, [lastResult]);
 
-    try {
-      const state = await emotionalProfileService.setEmotionalState(
-        userId, 
-        { emotions: newState.emotions }, 
-        newState.context || {}
-      );
+  /**
+   * Obtenir le sentiment du dernier r√©sultat
+   */
+  const getSentiment = useCallback(() => {
+    return lastResult?.sentiment || null;
+  }, [lastResult]);
+
+  /**
+   * Obtenir les √©motions format√©es pour l'UI
+   */
+  const getEmotionsForUI = useCallback(() => {
+    if (!lastResult?.emotions) return [];
+
+    return Object.entries(lastResult.emotions)
+      .map(([emotion, intensity]) => ({
+        emotion,
+        intensity,
+        label: getEmotionLabel(emotion),
+        color: getEmotionColor(emotion),
+        icon: getEmotionIcon(emotion)
+      }))
+      .sort((a, b) => b.intensity - a.intensity)
+      .slice(0, 5); // Top 5
+  }, [lastResult]);
+
+  /**
+   * Obtenir les tendances √©motionnelles
+   */
+  const getEmotionalTrends = useCallback(() => {
+    if (history.length < 2) return null;
+
+    const recent = history.slice(-5);
+    const trends = {};
+
+    Object.values(BASIC_EMOTIONS).forEach(emotion => {
+      const values = recent.map(result => result.emotions[emotion] || 0);
+      const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const trend = values.length > 1 ? values[values.length - 1] - values[0] : 0;
       
-      if (state) {
-        setCurrentState(state);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Erreur mise ‡ jour Ètat Èmotionnel:', error);
-      setError(error.message);
-      return false;
-    }
-  }, [userId]);
+      trends[emotion] = {
+        average: avg,
+        trend: trend > 0.1 ? 'increasing' : trend < -0.1 ? 'decreasing' : 'stable',
+        change: Math.abs(trend)
+      };
+    });
+
+    return trends;
+  }, [history]);
 
   /**
-   * RafraÓchissement des donnÈes
+   * R√©initialiser l'√©tat
    */
-  const refreshEmotionalState = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      await initializeEmotionalData();
-      
-      if (recipientId) {
-        await loadCompatibilityData();
-      }
-    } catch (error) {
-      console.error('Erreur rafraÓchissement:', error);
+  const reset = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
-  }, [userId, recipientId]);
-
-  /**
-   * Configuration de l'analyse
-   */
-  const updateAnalysisConfig = useCallback((newConfig) => {
-    setAnalysisConfig(prev => new EmotionAnalysisConfig({ ...prev, ...newConfig }));
+    setIsAnalyzing(false);
+    setLastResult(null);
+    setError(null);
+    setHistory([]);
   }, []);
 
   /**
-   * Nettoyage et optimisation
+   * Mettre √† jour la configuration
    */
-  const clearCache = useCallback(async () => {
-    try {
-      await advancedEmotionService.clearCache();
-      lastAnalysisRef.current = null;
-      analysisQueueRef.current = [];
-    } catch (error) {
-      console.error('Erreur nettoyage cache:', error);
-    }
+  const updateConfig = useCallback((newConfig) => {
+    configRef.current = new EmotionAnalysisConfig({
+      ...configRef.current,
+      ...newConfig
+    });
   }, []);
 
-  /**
-   * Statistiques d'usage
-   */
-  const getUsageStats = useCallback(async () => {
-    try {
-      const stats = await advancedEmotionService.getUsageStats();
-      return {
-        ...stats,
-        profileLoaded: !!currentProfile,
-        stateActive: !!currentState,
-        compatibilityCalculated: !!compatibility,
-        historyEntries: emotionHistory?.entries?.length || 0
-      };
-    } catch (error) {
-      console.error('Erreur rÈcupÈration stats:', error);
-      return null;
-    }
-  }, [currentProfile, currentState, compatibility, emotionHistory]);
-
-  /**
-   * Recommandations d'interaction
-   */
-  const getInteractionRecommendations = useCallback(() => {
-    if (!currentState || !compatibility) {
-      return {
-        timing: 'normal',
-        tone: 'neutral',
-        approach: 'standard',
-        warnings: []
-      };
-    }
-
-    const recommendations = {
-      timing: 'normal',
-      tone: 'neutral',
-      approach: 'standard',
-      warnings: []
+  // Nettoyage au d√©montage
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
-
-    // Analyse de l'Ètat Èmotionnel
-    if (currentState.availability === 'do_not_disturb') {
-      recommendations.timing = 'avoid';
-      recommendations.warnings.push('L\'utilisateur ne souhaite pas Ítre dÈrangÈ');
-    } else if (currentState.stress > 0.7) {
-      recommendations.tone = 'gentle';
-      recommendations.approach = 'supportive';
-      recommendations.warnings.push('Niveau de stress ÈlevÈ dÈtectÈ');
-    } else if (currentState.energy < 0.3) {
-      recommendations.approach = 'brief';
-      recommendations.warnings.push('Niveau d\'Ènergie faible');
-    }
-
-    // Analyse de la compatibilitÈ
-    if (compatibility.overallScore < 0.4) {
-      recommendations.tone = 'formal';
-      recommendations.approach = 'careful';
-      recommendations.warnings.push('CompatibilitÈ Èmotionnelle faible');
-    } else if (compatibility.overallScore > 0.8) {
-      recommendations.tone = 'friendly';
-      recommendations.approach = 'natural';
-    }
-
-    return recommendations;
-  }, [currentState, compatibility]);
-
-  // DonnÈes de retour optimisÈes
-  const moodData = currentState ? {
-    mood: currentState.mood,
-    energy: currentState.energy,
-    stress: currentState.stress,
-    availability: currentState.availability,
-    dominantEmotion: currentState.currentEmotions ? 
-      Object.keys(currentState.currentEmotions).reduce((a, b) => 
-        currentState.currentEmotions[a] > currentState.currentEmotions[b] ? a : b
-      ) : null
-  } : null;
+  }, []);
 
   return {
-    // Fonctions principales
-    analyzeMessage,
-    analyzeTextQuick,
-    updateEmotionalState,
-    refreshEmotionalState,
-    
-    // …tats
+    // √âtat
     isAnalyzing,
-    currentProfile,
-    currentState,
-    moodData,
-    compatibility,
-    emotionHistory,
+    lastResult,
     error,
+    history,
     
-    // Configuration
-    analysisConfig,
-    updateAnalysisConfig,
+    // Actions
+    analyzeText,
+    analyzeBatch,
+    analyzeRealTime,
+    reset,
+    updateConfig,
     
-    // Utilitaires
-    clearCache,
-    getUsageStats,
-    getInteractionRecommendations,
+    // Getters
+    getDominantEmotion,
+    getSentiment,
+    getEmotionsForUI,
+    getEmotionalTrends,
     
-    // Validateurs
-    isValidEmotion: EmotionValidators.isValidEmotion,
-    isValidIntensity: EmotionValidators.isValidIntensity,
-    
-    // …tat de disponibilitÈ
-    isReady: !!currentProfile && !isProcessingRef.current
+    // Configuration actuelle
+    config: configRef.current
   };
 };
+
+// Utilitaires helper
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function getEmotionLabel(emotion) {
+  const labels = {
+    [BASIC_EMOTIONS.JOY]: 'Joie',
+    [BASIC_EMOTIONS.SADNESS]: 'Tristesse',
+    [BASIC_EMOTIONS.ANGER]: 'Col√®re',
+    [BASIC_EMOTIONS.FEAR]: 'Peur',
+    [BASIC_EMOTIONS.SURPRISE]: 'Surprise',
+    [BASIC_EMOTIONS.DISGUST]: 'D√©go√ªt',
+    [BASIC_EMOTIONS.TRUST]: 'Confiance',
+    [BASIC_EMOTIONS.ANTICIPATION]: 'Attente'
+  };
+  return labels[emotion] || emotion;
+}
+
+function getEmotionColor(emotion) {
+  const colors = {
+    [BASIC_EMOTIONS.JOY]: '#FFD700',
+    [BASIC_EMOTIONS.SADNESS]: '#4169E1',
+    [BASIC_EMOTIONS.ANGER]: '#DC143C',
+    [BASIC_EMOTIONS.FEAR]: '#9932CC',
+    [BASIC_EMOTIONS.SURPRISE]: '#FF8C00',
+    [BASIC_EMOTIONS.DISGUST]: '#228B22',
+    [BASIC_EMOTIONS.TRUST]: '#20B2AA',
+    [BASIC_EMOTIONS.ANTICIPATION]: '#FF1493'
+  };
+  return colors[emotion] || '#808080';
+}
+
+function getEmotionIcon(emotion) {
+  const icons = {
+    [BASIC_EMOTIONS.JOY]: 'üòä',
+    [BASIC_EMOTIONS.SADNESS]: 'üò¢',
+    [BASIC_EMOTIONS.ANGER]: 'üò†',
+    [BASIC_EMOTIONS.FEAR]: 'üò∞',
+    [BASIC_EMOTIONS.SURPRISE]: 'üòÆ',
+    [BASIC_EMOTIONS.DISGUST]: 'ü§¢',
+    [BASIC_EMOTIONS.TRUST]: 'ü§ù',
+    [BASIC_EMOTIONS.ANTICIPATION]: '‚è≥'
+  };
+  return icons[emotion] || 'üòê';
+}
 
 export default useEmotionAnalysis;

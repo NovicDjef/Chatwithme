@@ -1,8 +1,20 @@
 // hooks/translation/useRealTimeTranslation.js
-import { debounce } from 'lodash';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { translationService } from '../../services/translation/translationService';
 import { useNetworkStatus } from '../common/useNetworkStatus';
+
+// Fonction debounce simple pour remplacer lodash
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 export const useRealTimeTranslation = (options = {}) => {
   const {
