@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native';
-import UserListScreen from '../components/Chat/UserListScreen';
+import ProfileScreen from '../components/Profile/ProfileScreen';
 
-export default function HomeScreen() {
+export default function ProfileTabScreen() {
   return (
     <View style={styles.container}>
-      <UserListScreen />
+      <ProfileScreen />
     </View>
   );
 }
@@ -12,6 +12,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
   },
 });

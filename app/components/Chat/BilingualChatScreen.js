@@ -19,6 +19,8 @@ import { useRealTimeTranslation } from '../../hooks/translation/useRealTimeTrans
 
 // Composants de chat
 import VoiceRecorder from './VoiceRecorder.js';
+import DirectVoiceRecorder from './DirectVoiceRecorder.js';
+import InlineVoiceRecorder from './InlineVoiceRecorder.js';
 import AudioWaveform from './AudioWaveform.js';
 import ImagePicker from './ImagePicker.js';
 
@@ -46,8 +48,10 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
   const [inputText, setInputText] = useState('');
   const [currentUser, setCurrentUser] = useState(1); // 1 ou 2
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showDirectVoiceRecorder, setShowDirectVoiceRecorder] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(null);
+  const [isRecordingInline, setIsRecordingInline] = useState(false);
 
   // Informations du chat depuis les paramètres de route
   const params = route?.params || {};
@@ -139,6 +143,8 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
 
     // Fermer l'enregistreur vocal
     setShowVoiceRecorder(false);
+    setShowDirectVoiceRecorder(false);
+    setIsRecordingInline(false);
   }, [currentUser, user1Language, user2Language, translateText]);
 
   // Fonction pour envoyer une image
@@ -342,8 +348,6 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
                 {Math.floor((message.duration || 0) / 60)}:{((message.duration || 0) % 60).toString().padStart(2, '0')}
               </Text>
             </TouchableOpacity>
-
-            <Text style={styles.transcriptionLabel}>Transcription:</Text>
           </View>
         )}
 
@@ -370,22 +374,27 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
           </View>
         )}
 
-        <Text style={styles.messageText}>{displayText || 'Message en cours de traitement...'}</Text>
+        {/* Afficher le texte seulement pour les messages non-vocaux */}
+        {message.type !== 'voice' && (
+          <>
+            <Text style={styles.messageText}>{displayText || 'Message en cours de traitement...'}</Text>
 
-        {!isCurrentUser && !message.translationError && displayLanguage && (
-          <Text style={styles.translationInfo}>
-            📝 Traduit de {originalLang.name} vers {displayLang.name}
-          </Text>
-        )}
+            {!isCurrentUser && !message.translationError && displayLanguage && (
+              <Text style={styles.translationInfo}>
+                📝 Traduit de {originalLang.name} vers {displayLang.name}
+              </Text>
+            )}
 
-        {message.translationError && (
-          <Text style={styles.translationError}>
-            ⚠️ Erreur de traduction
-          </Text>
-        )}
+            {message.translationError && (
+              <Text style={styles.translationError}>
+                ⚠️ Erreur de traduction
+              </Text>
+            )}
 
-        {message.isTranslating && (
-          <Text style={styles.translatingText}>⏳ Traduction en cours...</Text>
+            {message.isTranslating && (
+              <Text style={styles.translatingText}>⏳ Traduction en cours...</Text>
+            )}
+          </>
         )}
       </View>
     );
@@ -692,45 +701,55 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
 
       {/* Zone de saisie */}
       <View style={styles.inputContainer}>
-        <View style={styles.inputActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => setShowImagePicker(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="camera" size={24} color="#6b7280" />
-          </TouchableOpacity>
+        {isRecordingInline ? (
+          /* Mode enregistrement - Pleine largeur */
+          <InlineVoiceRecorder
+            onSendVoiceNote={handleSendVoiceNote}
+            onCancel={() => setIsRecordingInline(false)}
+            language={currentUser === 1 ? user1Language : user2Language}
+            onRecordingStateChange={(isRecording) => setIsRecordingInline(isRecording)}
+          />
+        ) : (
+          /* Mode normal - Layout standard */
+          <>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => setShowImagePicker(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="camera" size={24} color="#6b7280" />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => setShowVoiceRecorder(true)}
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="keyboard-voice" size={24} color="#8b5cf6" />
-          </TouchableOpacity>
-        </View>
+            <InlineVoiceRecorder
+              onSendVoiceNote={handleSendVoiceNote}
+              onCancel={() => setIsRecordingInline(false)}
+              language={currentUser === 1 ? user1Language : user2Language}
+              onRecordingStateChange={(isRecording) => setIsRecordingInline(isRecording)}
+            />
 
-        <TextInput
-          style={styles.textInput}
-          placeholder={`Écrire en ${SUPPORTED_LANGUAGES[currentUser === 1 ? user1Language : user2Language].name}...`}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          maxLength={500}
-        />
+            <TextInput
+              style={styles.textInput}
+              placeholder={`Écrire en ${SUPPORTED_LANGUAGES[currentUser === 1 ? user1Language : user2Language].name}...`}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+            />
 
-        <TouchableOpacity
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-          onPress={sendMessage}
-          disabled={!inputText.trim() || isTranslating}
-          activeOpacity={0.8}
-        >
-          {isTranslating ? (
-            <MaterialIcons name="sync" size={20} color="#ffffff" />
-          ) : (
-            <Ionicons name="send" size={20} color="#ffffff" />
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+              onPress={sendMessage}
+              disabled={!inputText.trim() || isTranslating}
+              activeOpacity={0.8}
+            >
+              {isTranslating ? (
+                <MaterialIcons name="sync" size={20} color="#ffffff" />
+              ) : (
+                <Ionicons name="send" size={20} color="#ffffff" />
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Sélecteur d'images */}
@@ -739,6 +758,7 @@ const BilingualChatScreen = ({ route, navigation, onBackPress }) => {
         onClose={() => setShowImagePicker(false)}
         onSendImage={handleSendImage}
       />
+
 
         {/* Menu hamburger */}
         <HamburgerMenu />
@@ -1502,11 +1522,6 @@ const styles = StyleSheet.create({
   },
 
   // Styles pour les actions de saisie
-  inputActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-  },
   actionButton: {
     width: 40,
     height: 40,
@@ -1514,7 +1529,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginRight: 8,
+  },
+
+  inputMainArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   // Styles pour les messages audio

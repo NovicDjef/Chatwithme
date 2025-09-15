@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Audio } from 'expo-av';
 import { Alert, Platform } from 'react-native';
+import RecordingManager from '../../utils/RecordingManager';
 
 export const useVoiceRecording = () => {
   const [recording, setRecording] = useState(null);
@@ -57,37 +58,52 @@ export const useVoiceRecording = () => {
   // Démarrer l'enregistrement
   const startRecording = useCallback(async () => {
     try {
+      console.log('useVoiceRecording: startRecording called');
+      console.log('Permission status:', permissionResponse?.status);
+
       if (permissionResponse?.status !== 'granted') {
         console.log('Requesting permission...');
-        await requestPermission();
+        const result = await requestPermission();
+        console.log('Permission request result:', result);
+
+        if (!result.granted) {
+          Alert.alert(
+            'Permission requise',
+            'L\'accès au microphone est nécessaire pour enregistrer des notes vocales.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      console.log('Starting recording using RecordingManager...');
+      const newRecording = await RecordingManager.startRecording();
+      console.log('RecordingManager returned:', newRecording ? 'Recording object' : 'null');
 
-      console.log('Starting recording...');
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(recording);
+      setRecording(newRecording);
       setIsRecording(true);
       setTranscription('');
 
       // Simuler la transcription en temps réel
+      console.log('Starting real-time transcription simulation...');
       simulateRealtimeTranscription('fr');
 
+      console.log('useVoiceRecording: Recording started successfully');
+
     } catch (err) {
-      console.error('Failed to start recording', err);
-      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement');
+      console.error('useVoiceRecording: Failed to start recording', err);
+      console.error('Error details:', err.message, err.code);
+      Alert.alert('Erreur', 'Impossible de démarrer l\'enregistrement: ' + err.message);
+      // Reset states en cas d'erreur
+      setRecording(null);
+      setIsRecording(false);
     }
   }, [permissionResponse, requestPermission, simulateRealtimeTranscription]);
 
   // Arrêter l'enregistrement
   const stopRecording = useCallback(async () => {
     try {
-      console.log('Stopping recording...');
+      console.log('Stopping recording using RecordingManager...');
       setIsRecording(false);
 
       // Arrêter le timer de transcription
@@ -96,43 +112,41 @@ export const useVoiceRecording = () => {
         transcriptionTimer.current = null;
       }
 
-      if (recording) {
-        await recording.stopAndUnloadAsync();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-        });
+      const result = await RecordingManager.stopRecording();
 
-        const uri = recording.getURI();
-        setAudioUri(uri);
-        console.log('Recording stored at', uri);
+      if (result?.audioUri) {
+        setAudioUri(result.audioUri);
+        console.log('Recording stored at', result.audioUri);
       }
 
+      // Nettoyer l'état local
+      setRecording(null);
+
       return {
-        audioUri: recording?.getURI(),
+        audioUri: result?.audioUri,
         transcription: transcription
       };
     } catch (error) {
       console.error('Failed to stop recording', error);
       Alert.alert('Erreur', 'Impossible d\'arrêter l\'enregistrement');
+      return null;
     }
-  }, [recording, transcription]);
+  }, [transcription]);
 
   // Annuler l'enregistrement
   const cancelRecording = useCallback(async () => {
     try {
+      console.log('Canceling recording using RecordingManager...');
+
       // Arrêter le timer de transcription
       if (transcriptionTimer.current) {
         clearInterval(transcriptionTimer.current);
         transcriptionTimer.current = null;
       }
 
-      if (recording) {
-        await recording.stopAndUnloadAsync();
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-        });
-      }
+      await RecordingManager.cancelRecording();
 
+      // Reset tous les états locaux
       setRecording(null);
       setIsRecording(false);
       setIsTranscribing(false);
@@ -140,8 +154,14 @@ export const useVoiceRecording = () => {
       setAudioUri(null);
     } catch (error) {
       console.error('Failed to cancel recording', error);
+      // Force le reset des états même en cas d'erreur
+      setRecording(null);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      setTranscription('');
+      setAudioUri(null);
     }
-  }, [recording]);
+  }, []);
 
   // Lire l'enregistrement
   const playRecording = useCallback(async (uri) => {

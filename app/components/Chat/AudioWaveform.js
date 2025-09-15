@@ -21,14 +21,27 @@ const AudioWaveform = ({
   const generateWavePattern = () => {
     const pattern = [];
     for (let i = 0; i < barCount; i++) {
-      // Créer un motif d'onde basé sur sin/cos pour un aspect réaliste
-      const phase = (i / barCount) * Math.PI * 4;
-      const amplitude = Math.sin(phase) * 0.7 + Math.cos(phase * 0.5) * 0.3;
-      const normalizedAmplitude = (amplitude + 1) / 2; // Normaliser entre 0 et 1
+      // Créer plusieurs couches d'ondes pour plus de complexité
+      const phase1 = (i / barCount) * Math.PI * 6;  // Onde principale
+      const phase2 = (i / barCount) * Math.PI * 2.3; // Onde secondaire
+      const phase3 = (i / barCount) * Math.PI * 12;  // Détails fins
 
-      // Ajouter de la variation basée sur la durée
-      const durationFactor = Math.min(duration / 10, 1); // Max à 10 secondes
-      const height = minHeight + (maxHeight - minHeight) * normalizedAmplitude * durationFactor;
+      // Combiner plusieurs sinusoïdes
+      const wave1 = Math.sin(phase1) * 0.5;
+      const wave2 = Math.sin(phase2) * 0.3;
+      const wave3 = Math.sin(phase3) * 0.2;
+      const noise = (Math.random() - 0.5) * 0.1; // Bruit léger
+
+      const combinedWave = wave1 + wave2 + wave3 + noise;
+      const normalizedAmplitude = (combinedWave + 1) / 2; // Normaliser entre 0 et 1
+
+      // Facteur basé sur la durée avec courbe non-linéaire
+      const durationFactor = Math.pow(Math.min(duration / 15, 1), 0.7);
+
+      // Variation d'intensité selon la position (plus fort au centre)
+      const positionFactor = 1 - Math.pow(Math.abs((i - barCount/2) / (barCount/2)), 2) * 0.3;
+
+      const height = minHeight + (maxHeight - minHeight) * normalizedAmplitude * durationFactor * positionFactor;
 
       pattern.push(Math.max(minHeight, Math.min(maxHeight, height)));
     }
@@ -40,37 +53,50 @@ const AudioWaveform = ({
   // Animation de lecture
   useEffect(() => {
     if (isPlaying) {
-      // Animation de "lecture" qui traverse l'onde
+      // Animation de "lecture" qui traverse l'onde avec effet de vague
       const playAnimation = () => {
         const animationPromises = animations.map((animation, index) => {
+          const delay = index * 80; // Délai pour effet de vague
+          const intensityMultiplier = 1.3 + Math.sin(index * 0.5) * 0.4; // Variation d'intensité
+
           return Animated.sequence([
-            Animated.delay(index * 100), // Délai progressif
+            Animated.delay(delay),
+            // Montée plus douce
             Animated.timing(animation, {
-              toValue: staticHeights[index] * 1.5,
-              duration: 200,
+              toValue: staticHeights[index] * intensityMultiplier,
+              duration: 150,
               useNativeDriver: false,
             }),
-            Animated.timing(animation, {
+            // Maintien court
+            Animated.delay(50),
+            // Descente avec rebond
+            Animated.spring(animation, {
               toValue: staticHeights[index],
-              duration: 200,
+              tension: 100,
+              friction: 8,
               useNativeDriver: false,
             }),
           ]);
         });
 
-        Animated.parallel(animationPromises).start(() => {
-          // Remettre toutes les barres à leur hauteur statique
-          animations.forEach((animation, index) => {
-            animation.setValue(staticHeights[index]);
-          });
+        Animated.stagger(30, animationPromises).start(() => {
+          // Animation continue pendant la lecture
+          if (isPlaying) {
+            setTimeout(playAnimation, 500);
+          }
         });
       };
 
       playAnimation();
     } else {
-      // État statique - définir les hauteurs fixes
+      // État statique - définir les hauteurs fixes avec transition douce
       animations.forEach((animation, index) => {
-        animation.setValue(staticHeights[index]);
+        Animated.spring(animation, {
+          toValue: staticHeights[index],
+          tension: 120,
+          friction: 8,
+          useNativeDriver: false,
+        }).start();
       });
     }
   }, [isPlaying, animations, staticHeights]);
@@ -110,8 +136,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bar: {
-    borderRadius: 1,
+    borderRadius: 2,
     backgroundColor: '#8b5cf6',
+    shadowColor: '#8b5cf6',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 
